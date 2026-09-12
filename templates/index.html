@@ -1,0 +1,926 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>StAT - NFC Attendance Tracker</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="/static/css/all.min.css">
+    <style>body { font-family: sans-serif; }</style>
+</head>
+<body class="text-slate-800 min-h-screen flex flex-col bg-slate-50">
+    <header class="bg-indigo-600 text-white shadow p-4">
+        <div class="max-w-6xl mx-auto flex justify-between items-center">
+            <div class="flex items-center gap-2">
+                <!-- Hamburger Menu for Admins -->
+                <button id="menu-btn" onclick="toggleMenu()" class="hidden text-xl cursor-pointer mr-2">
+                    <i class="fa-solid fa-bars"></i>
+                </button>
+                <i class="fa-solid fa-id-card-clip text-xl"></i>
+                <h1 class="text-lg font-bold">StAT</h1>
+            </div>
+            <div class="flex items-center gap-3">
+                <div id="admin-badge" class="hidden items-center gap-2 px-3 py-1 rounded-full text-xs font-semibold bg-emerald-500/20 text-emerald-200">
+                    <i class="fa-solid fa-user-shield"></i> Admin
+                </div>
+                <button onclick="openAdminLogin()" id="admin-login-btn" class="px-3 py-1.5 rounded-xl text-xs font-bold bg-white/10 hover:bg-white/20 transition cursor-pointer">
+                    <i class="fa-solid fa-lock mr-1"></i> Admin Login
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- Admin Drawer -->
+    <div id="nav-drawer" class="hidden fixed inset-0 z-40">
+        <div class="absolute inset-0 bg-slate-900/50" onclick="toggleMenu()"></div>
+        <div class="absolute left-0 top-0 h-full w-64 bg-white shadow-xl p-6 space-y-4">
+            <h2 class="font-bold text-slate-800 mb-6">Admin Menu</h2>
+            <button onclick="switchView('nfc')" class="block w-full text-left py-2 text-sm font-semibold text-slate-700 hover:text-indigo-600">NFC Management</button>
+            <button onclick="switchView('db')" class="block w-full text-left py-2 text-sm font-semibold text-slate-700 hover:text-indigo-600">Attendance Logs</button>
+            <hr>
+            <button onclick="adminLogout()" class="block w-full text-left py-2 text-sm font-semibold text-rose-600 hover:text-rose-800">Logout</button>
+        </div>
+    </div>
+
+    <main class="flex-1 max-w-6xl w-full mx-auto p-4 space-y-6">
+        <!-- Tab navigation placeholder, now handled by Drawer/Menu -->
+        <div id="main-content" class="space-y-6">
+
+        <div id="c-student" class="tab-c block max-w-md mx-auto space-y-4">
+            <div class="text-center">
+                <div class="inline-flex p-3 bg-indigo-50 text-indigo-600 rounded-full mb-2">
+                    <i class="fa-solid fa-user-check text-xl"></i>
+                </div>
+                <h2 class="font-bold text-slate-900 text-base">Classroom Attendance Check-in</h2>
+                <p class="text-xs text-slate-500">Tapping lecturer's NFC tag automatically logs your attendance.</p>
+            </div>
+
+            <!-- Auto Check-in View (When Profile is Cached) -->
+            <div id="auto-checkin-box" class="hidden text-center py-6 space-y-3">
+                <div class="inline-flex p-3 bg-indigo-50 text-indigo-600 rounded-full text-xl animate-pulse">
+                    <i class="fa-solid fa-spinner fa-spin"></i>
+                </div>
+                <h3 class="font-bold text-slate-800 text-sm">Automatically Checking In...</h3>
+                <div class="bg-slate-50 p-3 rounded-xl border text-left space-y-1">
+                    <p class="text-xs text-slate-500">Student: <span id="auto-student-name" class="font-bold text-slate-800"></span></p>
+                    <p class="text-xs text-slate-500">Reg No: <span id="auto-student-reg" class="font-bold text-slate-800"></span></p>
+                    <p class="text-xs text-slate-500">Programme: <span id="auto-student-prog" class="font-bold text-slate-800"></span></p>
+                </div>
+            </div>
+
+            <!-- First-Time Form View -->
+            <div id="checkin-form-box" class="hidden">
+                <div class="bg-amber-50 border border-amber-200 text-amber-800 p-3 rounded-xl text-xs mb-4">
+                    <i class="fa-solid fa-circle-info mr-1"></i> First time setup: Enter your details below once. Future taps will log you in <strong>automatically</strong> with zero typing!
+                </div>
+                <form onsubmit="studentCheckin(event)" class="space-y-4">
+                    <div>
+                        <label class="block text-[11px] font-bold text-slate-700 mb-1">Full Name</label>
+                        <input type="text" id="s-name" placeholder="e.g. Alice Smith" required class="w-full px-3 py-2 border rounded-xl text-xs focus:ring-2 focus:ring-indigo-500">
+                    </div>
+                    <div>
+                        <label class="block text-[11px] font-bold text-slate-700 mb-1">Registration / Student Number</label>
+                        <input type="text" id="s-reg" placeholder="e.g. STU/2026/001" required class="w-full px-3 py-2 border rounded-xl text-xs focus:ring-2 focus:ring-indigo-500">
+                    </div>
+                    <div>
+                        <label class="block text-[11px] font-bold text-slate-700 mb-1">Programme / Course</label>
+                        <input type="text" id="s-prog" placeholder="e.g. BSc Computer Science" required class="w-full px-3 py-2 border rounded-xl text-xs focus:ring-2 focus:ring-indigo-500">
+                    </div>
+                    <button type="submit" class="w-full bg-indigo-600 text-white font-bold py-2.5 rounded-xl text-xs hover:bg-indigo-700 transition cursor-pointer">Save & Check In</button>
+                </form>
+            </div>
+
+            <!-- Success View -->
+            <div id="checkin-success-box" class="hidden text-center py-6 space-y-3">
+                <div class="inline-flex p-3 bg-emerald-100 text-emerald-600 rounded-full text-2xl">
+                    <i class="fa-solid fa-circle-check"></i>
+                </div>
+                <h3 class="font-bold text-emerald-800 text-sm">Attendance Logged Successfully!</h3>
+                <p id="success-details" class="text-xs text-slate-600"></p>
+                <div class="pt-2">
+                </div>
+            </div>
+        </div>
+
+        <div id="c-nfc" class="tab-c hidden space-y-4">
+            <!-- Subview: Program -->
+            <div id="sub-prog" class="max-w-lg mx-auto space-y-6">
+                <div class="relative bg-white p-6 rounded-2xl border shadow-sm space-y-4">
+                    <div class="text-center mb-2">
+                        <div class="inline-flex p-2.5 bg-indigo-50 text-indigo-600 rounded-full mb-1">
+                            <i class="fa-solid fa-wifi text-lg"></i>
+                        </div>
+                        <h2 class="font-bold text-slate-900 text-sm">Create Class Session & Program Tag</h2>
+                        <p class="text-[11px] text-slate-500">Enter class details. A unique link will be generated and pinned to attendance logs.</p>
+                    </div>
+                    <form onsubmit="createSessionAndWriteTag(event)" class="space-y-3">
+                        <div>
+                            <label class="block text-[11px] font-bold text-slate-700 mb-1">Lecturer Name</label>
+                            <input type="text" id="s-lecturer" placeholder="e.g. Dr. John Doe" required class="w-full px-3 py-2 border rounded-xl text-xs focus:ring-2 focus:ring-indigo-500">
+                        </div>
+                        <div>
+                            <label class="block text-[11px] font-bold text-slate-700 mb-1">Class Title / Course</label>
+                            <input type="text" id="s-title" placeholder="e.g. CS101: Intro to Computer Science" required class="w-full px-3 py-2 border rounded-xl text-xs focus:ring-2 focus:ring-indigo-500">
+                        </div>
+                        <div class="grid grid-cols-2 gap-2">
+                            <div>
+                                <label class="block text-[11px] font-bold text-slate-700 mb-1">Date</label>
+                                <input type="date" id="s-date" required class="w-full px-3 py-2 border rounded-xl text-xs focus:ring-2 focus:ring-indigo-500">
+                            </div>
+                            <div>
+                                <label class="block text-[11px] font-bold text-slate-700 mb-1">Time Window</label>
+                                <input type="text" id="s-time" placeholder="e.g. 14:00 - 15:00" required class="w-full px-3 py-2 border rounded-xl text-xs focus:ring-2 focus:ring-indigo-500">
+                            </div>
+                        </div>
+                        <button type="submit" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2.5 rounded-xl text-xs transition cursor-pointer">Generate Link & Program NFC Tag</button>
+                    </form>
+                    
+                    <!-- Link Display Container -->
+                    <div id="session-link-container" class="hidden mt-4 pt-4 border-t">
+                        <label class="block text-[11px] font-bold text-slate-700 mb-1">Generated Check-in Link</label>
+                        <div class="flex gap-2">
+                            <input type="text" id="s-generated-link" readonly class="w-full px-3 py-2 border rounded-xl text-xs bg-slate-50 text-slate-600 font-mono">
+                            <button onclick="copyLink()" class="px-3 bg-slate-200 hover:bg-slate-300 rounded-xl text-xs font-bold transition cursor-pointer">Copy</button>
+                        </div>
+                    </div>
+                </div>
+                <!-- Existing Sessions List -->
+                <div class="bg-white p-6 rounded-2xl border shadow-sm">
+                    <h3 class="font-bold text-slate-900 text-sm mb-4">Existing Sessions</h3>
+                    <div id="sessions-list-prog" class="space-y-2">
+                        <p class="text-xs text-slate-400">Loading...</p>
+                    </div>
+                </div>
+
+
+
+                <div class="relative hidden">
+                    <div class="text-center mb-4">
+                        <h2 class="font-bold text-slate-900 text-sm">Program Individual Student Tag (Alternative)</h2>
+                        <p class="text-[11px] text-slate-500">Write Name, Reg and Programme onto individual student tags.</p>
+                    </div>
+                    <form onsubmit="writeTag(event)" class="space-y-4">
+                        <input type="text" id="w-name" placeholder="Student Full Name" required class="w-full px-3 py-2 border rounded-xl text-xs focus:ring-2 focus:ring-indigo-500">
+                        <input type="text" id="w-reg" placeholder="Reg / ID Number" required class="w-full px-3 py-2 border rounded-xl text-xs focus:ring-2 focus:ring-indigo-500">
+                        <input type="text" id="w-prog" placeholder="Programme / Course" required class="w-full px-3 py-2 border rounded-xl text-xs focus:ring-2 focus:ring-indigo-500">
+                        <button type="submit" id="b-write" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2.5 rounded-xl text-xs transition cursor-pointer">Write Student Tag</button>
+                    </form>
+                </div>
+            </div>
+
+            <!-- Overlay for writing tags -->
+            <div id="overlay" class="hidden fixed inset-0 bg-slate-900/90 z-50 flex flex-col items-center justify-center text-center p-4">
+                <i class="fa-solid fa-wifi rotate-90 text-3xl text-indigo-400 animate-bounce mb-3"></i>
+                <h3 class="text-white text-base font-bold">Hold NFC Tag Near Phone</h3>
+                <p class="text-xs text-slate-400 mt-1">Keep tag steady until success confirmation.</p>
+                <button onclick="cancelW()" class="mt-5 px-4 py-2 bg-slate-800 text-slate-200 text-xs rounded-xl border border-slate-700 hover:bg-slate-700 cursor-pointer">Cancel</button>
+            </div>
+        </div>
+
+        <div id="c-db" class="tab-c hidden space-y-4">
+            <div class="flex justify-between items-center flex-wrap gap-2">
+                <div>
+                    <h2 class="font-bold text-slate-900" id="db-title">Attendance Database</h2>
+                    <p class="text-xs text-slate-500" id="db-subtitle">Select a session to view records.</p>
+                </div>
+                <div class="flex items-center gap-2">
+                    <button id="db-back-btn" onclick="showSessionList()" class="hidden bg-slate-200 text-slate-700 font-bold py-1.5 px-3 rounded-xl text-xs">Back to Sessions</button>
+                    <input type="text" id="search" oninput="filter()" placeholder="Search..." class="px-3 py-1.5 border rounded-xl text-xs focus:ring-2 focus:ring-indigo-500">
+                    <button onclick="exportCSV()" class="bg-emerald-600 text-white font-bold py-1.5 px-3 rounded-xl text-xs">Export CSV</button>
+                    <button onclick="clearDB()" class="bg-rose-50 text-rose-600 border border-rose-100 font-bold py-1.5 px-3 rounded-xl text-xs">Reset</button>
+                </div>
+            </div>
+
+            <!-- List View -->
+            <div id="db-list-view" class="space-y-3">
+                <!-- Session cards will be rendered here -->
+            </div>
+
+            <!-- Detail View -->
+            <div id="db-detail-view" class="hidden overflow-x-auto bg-white border border-slate-100 rounded-xl">
+                <table class="w-full text-left text-xs">
+                    <thead>
+                        <tr class="bg-slate-50 border-b text-slate-500 font-bold">
+                            <th class="py-2 px-4 text-center w-12">ID</th>
+                            <th class="py-2 px-4">Name</th>
+                            <th class="py-2 px-4">Reg Number</th>
+                            <th class="py-2 px-4">Programme</th>
+                            <th class="py-2 px-4">Timestamp</th>
+                        </tr>
+                    </thead>
+                    <tbody id="table-body" class="divide-y text-slate-700">
+                        <!-- Records will be rendered here -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        </div> <!-- Close main-content -->
+        <!-- Admin Login Modal -->
+        <div id="admin-login-modal" class="hidden fixed inset-0 bg-slate-900/80 z-50 flex items-center justify-center p-4">
+            <div class="bg-white max-w-sm w-full p-6 rounded-2xl shadow-xl space-y-4">
+                <div class="text-center">
+                    <div class="inline-flex p-3 bg-indigo-50 text-indigo-600 rounded-full mb-2">
+                        <i class="fa-solid fa-user-shield text-xl"></i>
+                    </div>
+                    <h3 class="font-bold text-slate-900 text-base">Admin Portal Login</h3>
+                    <p class="text-xs text-slate-500">Lecturers & IT Technicians Authentication</p>
+                </div>
+                <form onsubmit="handleAdminLogin(event)" class="space-y-3">
+                    <div>
+                        <label class="block text-[11px] font-bold text-slate-700 mb-1">Admin Password / PIN</label>
+                        <input type="password" id="admin-password-input" placeholder="Enter admin password (default: admin123)" required class="w-full px-3 py-2 border rounded-xl text-xs focus:ring-2 focus:ring-indigo-500">
+                    </div>
+                    <div id="admin-login-error" class="hidden text-xs text-rose-600 font-semibold text-center"></div>
+                    <div class="flex gap-2 pt-2">
+                        <button type="button" onclick="closeAdminLogin()" class="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-600 font-bold py-2 rounded-xl text-xs transition cursor-pointer">Cancel</button>
+                        <button type="submit" class="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 rounded-xl text-xs transition cursor-pointer">Login</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </main>
+    <footer class="bg-white border-t border-slate-200 py-4 text-center text-[10px] text-slate-400 mt-6">
+        StAT Student Attendance Tracker | Supports secure Web NFC (HTTPS/localhost)
+    </footer>
+    <script>
+        let sab = null, wab = null, logs = [], actx = null;
+        let isAdmin = false, adminToken = null;
+
+        function openAdminLogin() {
+            document.getElementById('admin-login-modal').classList.remove('hidden');
+            document.getElementById('admin-password-input').focus();
+        }
+
+        function closeAdminLogin() {
+            document.getElementById('admin-login-modal').classList.add('hidden');
+            document.getElementById('admin-login-error').classList.add('hidden');
+            document.getElementById('admin-password-input').value = '';
+        }
+
+        async function handleAdminLogin(e) {
+            e.preventDefault();
+            const password = document.getElementById('admin-password-input').value;
+            const errorEl = document.getElementById('admin-login-error');
+            
+            try {
+                const res = await fetch('/api/admin/auth', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ password })
+                });
+                const data = await res.json();
+                
+                if (data.success) {
+                    isAdmin = true;
+                    adminToken = data.token;
+                    sessionStorage.setItem('adminToken', adminToken);
+                    updateAdminUI();
+                    closeAdminLogin();
+                    flash('success', 'Logged In', 'Welcome back, Administrator.');
+                } else {
+                    errorEl.innerText = data.error || 'Invalid credentials';
+                    errorEl.classList.remove('hidden');
+                }
+            } catch (err) {
+                errorEl.innerText = 'Server error during authentication';
+                errorEl.classList.remove('hidden');
+            }
+        }
+
+        function adminLogout() {
+            isAdmin = false;
+            adminToken = null;
+            sessionStorage.removeItem('adminToken');
+            updateAdminUI();
+            tab('student');
+            flash('info', 'Logged Out', 'Admin session has been terminated.');
+        }
+
+        function updateAdminUI() {
+            const adminBadge = document.getElementById('admin-badge');
+            const adminLoginBtn = document.getElementById('admin-login-btn');
+            const menuBtn = document.getElementById('menu-btn');
+
+            if (isAdmin) {
+                adminBadge.classList.replace('hidden', 'flex');
+                adminLoginBtn.classList.add('hidden');
+                menuBtn.classList.remove('hidden');
+                
+                // If on student view when logging in, switch to NFC management
+                const currentViewEl = document.querySelector('.tab-c.block');
+                if (currentViewEl && currentViewEl.id === 'c-student') {
+                    tab('nfc');
+                }
+            } else {
+                adminBadge.classList.replace('flex', 'hidden');
+                adminLoginBtn.classList.remove('hidden');
+                menuBtn.classList.add('hidden');
+                
+                // If currently on an admin view, switch back to student
+                const currentViewEl = document.querySelector('.tab-c.block');
+                if (currentViewEl && currentViewEl.id !== 'c-student') {
+                    tab('student');
+                }
+            }
+        }
+
+
+
+
+        function beep(t) {
+            try {
+                if (!actx) actx = new (window.AudioContext || window.webkitAudioContext)();
+                let osc = actx.createOscillator(), g = actx.createGain();
+                osc.connect(g); g.connect(actx.destination);
+                if (t === 'ok') {
+                    osc.frequency.setValueAtTime(523.25, actx.currentTime);
+                    osc.frequency.setValueAtTime(659.25, actx.currentTime + 0.1);
+                    g.gain.setValueAtTime(0.08, actx.currentTime);
+                    g.gain.exponentialRampToValueAtTime(0.01, actx.currentTime + 0.25);
+                    osc.start(); osc.stop(actx.currentTime + 0.3);
+                } else if (t === 'err') {
+                    osc.type = 'sawtooth'; osc.frequency.setValueAtTime(140, actx.currentTime);
+                    g.gain.setValueAtTime(0.12, actx.currentTime);
+                    g.gain.exponentialRampToValueAtTime(0.01, actx.currentTime + 0.35);
+                    osc.start(); osc.stop(actx.currentTime + 0.4);
+                } else if (t === 'write') {
+                    osc.frequency.setValueAtTime(587.33, actx.currentTime);
+                    osc.frequency.setValueAtTime(880, actx.currentTime + 0.08);
+                    g.gain.setValueAtTime(0.08, actx.currentTime);
+                    g.gain.exponentialRampToValueAtTime(0.01, actx.currentTime + 0.3);
+                    osc.start(); osc.stop(actx.currentTime + 0.35);
+                }
+            } catch (e) {}
+        }
+
+        window.onload = () => {
+            const urlParams = new URLSearchParams(window.location.search);
+            const sessionKey = urlParams.get('session');
+            if (sessionKey) {
+                localStorage.setItem('current_session_key', sessionKey);
+            }
+
+            if (window.location.pathname === '/checkin' || window.location.pathname === '/') {
+                tab('student');
+            }
+
+            checkAutoCheckin();
+            loadLogs();
+
+            const savedToken = sessionStorage.getItem('adminToken');
+            if (savedToken) {
+                isAdmin = true;
+                adminToken = savedToken;
+                updateAdminUI();
+            }
+        };
+
+
+        async function checkAutoCheckin() {
+            const savedName = localStorage.getItem('stat_name');
+            const savedReg = localStorage.getItem('stat_reg');
+            const savedProg = localStorage.getItem('stat_prog');
+            const todayStr = new Date().toISOString().split('T')[0];
+            const lastCheckedDate = localStorage.getItem('stat_checked_in_date');
+
+            if (savedName && savedReg) {
+                if (lastCheckedDate === todayStr) {
+                    document.getElementById('checkin-form-box').classList.add('hidden');
+                    document.getElementById('auto-checkin-box').classList.add('hidden');
+                    document.getElementById('checkin-success-box').classList.remove('hidden');
+                    document.getElementById('success-details').innerText = `${savedName} (${savedProg || 'N/A'}) already checked in for today.`;
+                } else {
+                    document.getElementById('checkin-form-box').classList.add('hidden');
+                    document.getElementById('checkin-success-box').classList.add('hidden');
+                    document.getElementById('auto-checkin-box').classList.remove('hidden');
+                    document.getElementById('auto-student-name').innerText = savedName;
+                    document.getElementById('auto-student-reg').innerText = savedReg;
+                    if (document.getElementById('auto-student-prog')) {
+                        document.getElementById('auto-student-prog').innerText = savedProg || 'N/A';
+                    }
+                    await executeCheckin(savedName, savedReg, savedProg);
+                }
+            } else {
+                document.getElementById('auto-checkin-box').classList.add('hidden');
+                document.getElementById('checkin-success-box').classList.add('hidden');
+                document.getElementById('checkin-form-box').classList.remove('hidden');
+            }
+        }
+
+        function getDeviceId() {
+            let id = localStorage.getItem('stat_device_id');
+            if (!id) {
+                id = 'dev_' + Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
+                localStorage.setItem('stat_device_id', id);
+            }
+            return id;
+        }
+
+        async function executeCheckin(name, reg, programme) {
+            try {
+                if (!programme) {
+                    programme = localStorage.getItem('stat_prog') || 'N/A';
+                }
+                const deviceId = getDeviceId();
+                const sessionKey = localStorage.getItem('current_session_key') || '';
+                const res = await fetch('/api/attendance', {
+                    method: 'POST',
+                    headers: { 
+                        'Content-Type': 'application/json',
+                        'X-Device-ID': deviceId
+                    },
+                    body: JSON.stringify({ name, reg, programme, device_id: deviceId, session_id: sessionKey })
+                });
+                
+                const body = await res.json();
+                const todayStr = new Date().toISOString().split('T')[0];
+
+                if (!res.ok) {
+                    if (res.status === 400 && (body.error && body.error.includes('already recorded'))) {
+                        localStorage.setItem('stat_checked_in_date', todayStr);
+                        document.getElementById('auto-checkin-box').classList.add('hidden');
+                        document.getElementById('checkin-form-box').classList.add('hidden');
+                        document.getElementById('checkin-success-box').classList.remove('hidden');
+                        document.getElementById('success-details').innerText = `${name} (${programme}) is already checked in for today.`;
+                        return;
+                    }
+                    throw new Error(body.error || "Server error");
+                }
+                const rec = body.record;
+                localStorage.setItem('stat_checked_in_date', todayStr);
+                beep('ok');
+
+                document.getElementById('auto-checkin-box').classList.add('hidden');
+                document.getElementById('checkin-form-box').classList.add('hidden');
+                document.getElementById('checkin-success-box').classList.remove('hidden');
+                document.getElementById('success-details').innerText = `${rec.name} (${rec.programme}) recorded at ${rec.timestamp}`;
+            } catch (err) {
+                beep('err');
+                document.getElementById('auto-checkin-box').classList.add('hidden');
+                document.getElementById('checkin-form-box').classList.remove('hidden');
+                alert("Check-in Error: " + err.message);
+            }
+        }
+
+        async function studentCheckin(e) {
+            e.preventDefault();
+            const name = document.getElementById('s-name').value.trim();
+            const reg = document.getElementById('s-reg').value.trim();
+            const programme = document.getElementById('s-prog').value.trim();
+            if (!name || !reg || !programme) return;
+
+            localStorage.setItem('stat_name', name);
+            localStorage.setItem('stat_reg', reg);
+            localStorage.setItem('stat_prog', programme);
+            await executeCheckin(name, reg, programme);
+        }
+
+        function editProfile() {
+            alert("Device Restriction: 1 device cannot be used to enter multiple accounts. This device is permanently bound to the registered student account.");
+        }
+
+        function toggleMenu() {
+            document.getElementById('nav-drawer').classList.toggle('hidden');
+        }
+
+        function switchView(view) {
+            toggleMenu();
+            tab(view);
+        }
+
+        function tab(name) {
+            document.querySelectorAll('.tab-c').forEach(t => {
+                t.classList.remove('block');
+                t.classList.add('hidden');
+            });
+            const target = document.getElementById(`c-${name}`);
+            if (target) {
+                target.classList.remove('hidden');
+                target.classList.add('block');
+            }
+            if (name === 'db') loadLogs();
+        }
+
+
+        let allSessions = [];
+
+        async function loadLogs() {
+            try {
+                console.log("Fetching /api/attendance...");
+                const res = await fetch('/api/attendance');
+                if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
+                allSessions = await res.json();
+                console.log("Sessions loaded:", allSessions);
+                
+                showSessionList();
+                renderSessionsListProg();
+                
+                // Flatten records for the feed
+                // const allAttendance = [];
+                // allSessions.forEach(s => {
+                //     if (s.attendance) {
+                //         s.attendance.forEach(a => {
+                //             allAttendance.push({...a, session_title: s.title});
+                //         });
+                //     }
+                // });
+                // allAttendance.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+                // renderFeed(allAttendance);
+            } catch (e) {
+                console.error("loadLogs error:", e);
+                document.getElementById('db-list-view').innerHTML = `<p class="text-center py-6 text-rose-500 font-bold">Error: ${escape(e.message)}</p>`;
+            }
+        }
+
+        function renderSessionsListProg() {
+            const listContainer = document.getElementById('sessions-list-prog');
+            listContainer.innerHTML = allSessions.length === 0
+                ? `<p class="text-xs text-slate-400">No sessions created yet.</p>`
+                : allSessions.map(s => `
+                    <div class="p-3 bg-slate-50 rounded-xl border border-slate-100">
+                        <div class="flex justify-between items-center mb-1">
+                            <span class="font-bold text-slate-800 text-xs">${escape(s.title)}</span>
+                            <span class="text-[9px] text-slate-500">${escape(s.start_time)}</span>
+                        </div>
+                        <div class="flex gap-2">
+                            <input type="text" readonly value="${window.location.origin}/checkin?session=${s.session_key}" class="flex-1 bg-white px-2 py-1 border rounded text-[10px] text-slate-600 font-mono">
+                            <button onclick="navigator.clipboard.writeText('${window.location.origin}/checkin?session=${s.session_key}'); alert('Link copied!');" class="px-2 bg-slate-200 rounded text-[10px] font-bold">Copy</button>
+                        </div>
+                    </div>
+                `).join('');
+        }
+
+
+        function showSessionList() {
+            document.getElementById('db-list-view').classList.remove('hidden');
+            document.getElementById('db-detail-view').classList.add('hidden');
+            document.getElementById('db-back-btn').classList.add('hidden');
+            document.getElementById('db-title').innerText = "Attendance Database";
+            document.getElementById('db-subtitle').innerText = "Select a session to view records.";
+
+            const listView = document.getElementById('db-list-view');
+            listView.innerHTML = allSessions.length === 0 
+                ? `<p class="text-center py-10 text-slate-400">No sessions found.</p>`
+                : allSessions.map(s => `
+                    <div class="bg-white p-4 rounded-xl border border-slate-200 flex justify-between items-center hover:border-indigo-300 hover:shadow-sm transition">
+                        <div onclick="showSessionDetail(${s.session_id})" class="flex-1 cursor-pointer">
+                            <h3 class="font-bold text-slate-900">${escape(s.title)}</h3>
+                            <p class="text-xs text-slate-500">${escape(s.lecturer_name)} • ${escape(s.start_time)}</p>
+                            <p class="text-[10px] text-slate-400 mt-1">${s.attendance ? s.attendance.length : 0} records</p>
+                        </div>
+                        <button onclick="deleteSession(${s.session_id})" class="p-2 text-slate-400 hover:text-rose-600 transition">
+                            <i class="fa-solid fa-trash"></i>
+                        </button>
+                    </div>
+                `).join('');
+        }
+
+        function showSessionDetail(sessionId) {
+            const session = allSessions.find(s => s.session_id === sessionId);
+            if (!session) return;
+
+            document.getElementById('db-list-view').classList.add('hidden');
+            document.getElementById('db-detail-view').classList.remove('hidden');
+            document.getElementById('db-back-btn').classList.remove('hidden');
+            document.getElementById('db-title').innerText = session.title;
+            document.getElementById('db-subtitle').innerText = `Lecturer: ${session.lecturer_name} | ${session.start_time}`;
+
+            const tbody = document.getElementById('table-body');
+            tbody.innerHTML = session.attendance.length === 0
+                ? `<tr><td colspan="5" class="text-center py-8 text-slate-400">No attendance for this session.</td></tr>`
+                : session.attendance.map(r => `
+                    <tr class="hover:bg-slate-50">
+                        <td class="py-2 px-4 text-center font-mono text-slate-400">${r.id}</td>
+                        <td class="py-2 px-4 font-semibold text-slate-900">${escape(r.name)}</td>
+                        <td class="py-2 px-4 font-mono text-slate-600">${escape(r.reg)}</td>
+                        <td class="py-2 px-4 text-slate-600">${escape(r.programme || 'N/A')}</td>
+                        <td class="py-2 px-4 font-mono text-slate-500">${escape(r.timestamp)}</td>
+                    </tr>
+                `).join('');
+        }
+
+
+
+
+
+        function renderFeed(data) {
+            const f = document.getElementById('feed');
+            f.querySelectorAll('.feed-i').forEach(i => i.remove());
+            if (data.length === 0) {
+                document.getElementById('feed-empty').classList.remove('hidden');
+                return;
+            }
+            document.getElementById('feed-empty').classList.add('hidden');
+            data.slice(0, 5).forEach(r => appendFeed(r.name, r.reg, r.programme, r.timestamp, false));
+        }
+
+        function appendFeed(name, reg, programme, timestamp, isNew = true) {
+            const f = document.getElementById('feed');
+            document.getElementById('feed-empty').classList.add('hidden');
+            const d = document.createElement('div');
+            d.className = `feed-i p-3 border rounded-xl flex justify-between items-center bg-slate-50/50 ${isNew ? 'animate-pulse border-indigo-200 bg-indigo-50/20' : ''}`;
+            d.innerHTML = `
+                <div>
+                    <h4 class="font-bold text-slate-800 text-xs">${escape(name)}</h4>
+                    <p class="font-mono text-[10px] text-slate-400">${escape(reg)} • <span class="text-slate-600 font-sans">${escape(programme || 'N/A')}</span></p>
+                </div>
+                <div class="text-right">
+                    <span class="text-[9px] font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-100">Clocked In</span>
+                    <p class="text-[9px] text-slate-400 mt-1"><i class="fa-regular fa-clock"></i> ${escape(timestamp)}</p>
+                </div>
+            `;
+            if (isNew) {
+                f.prepend(d);
+                if (f.querySelectorAll('.feed-i').length > 5) f.querySelector('.feed-i:last-child').remove();
+            } else {
+                f.appendChild(d);
+            }
+        }
+        async function createSessionAndWriteTag(e) {
+            e.preventDefault();
+            const lecturer = document.getElementById('s-lecturer').value.trim();
+            const title = document.getElementById('s-title').value.trim();
+            const date = document.getElementById('s-date').value;
+            const time = document.getElementById('s-time').value.trim();
+
+            if (!lecturer || !title || !date || !time) return;
+
+            try {
+                const res = await fetch('/api/sessions/create', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ lecturer, title, start_time: date + ' ' + time.split('-')[0].trim(), end_time: date + ' ' + time.split('-')[1]?.trim() || '' })
+                });
+                const data = await res.json();
+                if (data.session_key) {
+                    await writeSessionTag(data.session_key);
+                } else {
+                    alert("Failed to create session: " + (data.error || "Unknown error"));
+                }
+            } catch (err) {
+                alert("Server error: " + err.message);
+            }
+        }
+
+        function copyLink() {
+            const linkInput = document.getElementById('s-generated-link');
+            linkInput.select();
+            document.execCommand('copy');
+            alert("Link copied to clipboard!");
+        }
+
+        async function writeSessionTag(sessionKey) {
+            const checkinUrl = window.location.origin + '/checkin?session=' + sessionKey;
+            
+            // Display link in UI
+            document.getElementById('s-generated-link').value = checkinUrl;
+            document.getElementById('session-link-container').classList.remove('hidden');
+
+            if (!('NDEFReader' in window)) {
+                alert("Web NFC is not supported. Please copy the link below.");
+                return;
+            }
+            document.getElementById('overlay').classList.remove('hidden');
+            wab = new AbortController();
+            try {
+                const ndef = new NDEFReader();
+                const checkinUrl = window.location.origin + '/checkin?session=' + sessionKey;
+                await ndef.write({
+                    records: [{ recordType: "url", data: checkinUrl }]
+                }, { signal: wab.signal });
+                beep('write');
+                document.getElementById('overlay').classList.add('hidden');
+                alert("SUCCESS!\nNFC tag programmed with unique session check-in link:\n" + checkinUrl);
+            } catch (err) {
+                if (err.name !== 'AbortError') {
+                    beep('err');
+                    alert("Write failed: " + err.message);
+                }
+                document.getElementById('overlay').classList.add('hidden');
+            }
+        }
+
+
+        async function writeTeacherTag() {
+            if (!('NDEFReader' in window)) {
+                alert("Web NFC is not supported on this browser/device. Please use Chrome on Android or manually enter the URL into an NFC writer app: " + window.location.origin + "/checkin");
+                return;
+            }
+            document.getElementById('overlay').classList.remove('hidden');
+            wab = new AbortController();
+            try {
+                const ndef = new NDEFReader();
+                const checkinUrl = window.location.origin + '/checkin';
+                await ndef.write({
+                    records: [{ recordType: "url", data: checkinUrl }]
+                }, { signal: wab.signal });
+                beep('write');
+                document.getElementById('overlay').classList.add('hidden');
+                alert("SUCCESS!\nLecturer podium tag programmed with check-in link:\n" + checkinUrl + "\n\nStudents can now tap their phones on this tag to enter their details!");
+            } catch (err) {
+                if (err.name !== 'AbortError') {
+                    beep('err');
+                    alert("Write failed: " + err.message + "\nEnsure NFC is enabled and your phone is held steady against the tag.");
+                }
+                document.getElementById('overlay').classList.add('hidden');
+            }
+        }
+
+        async function studentCheckin(e) {
+            e.preventDefault();
+            const name = document.getElementById('s-name').value.trim();
+            const reg = document.getElementById('s-reg').value.trim();
+            const programme = document.getElementById('s-prog').value.trim();
+            if (!name || !reg || !programme) return;
+
+            localStorage.setItem('stat_name', name);
+            localStorage.setItem('stat_reg', reg);
+            localStorage.setItem('stat_prog', programme);
+            await executeCheckin(name, reg, programme);
+        }
+
+        function resetCheckin() {
+            document.getElementById('checkin-success-box').classList.add('hidden');
+            document.getElementById('checkin-form-box').classList.remove('hidden');
+        }
+        async function writeTag(e) {
+            e.preventDefault();
+            const name = document.getElementById('w-name').value.trim();
+            const reg = document.getElementById('w-reg').value.trim();
+            const programme = document.getElementById('w-prog').value.trim();
+            if (!name || !reg || !programme) return;
+            document.getElementById('overlay').classList.remove('hidden');
+            wab = new AbortController();
+            try {
+                const ndef = new NDEFReader();
+                await ndef.write({
+                    records: [{ recordType: "text", data: JSON.stringify({ name, reg, programme }) }]
+                }, { signal: wab.signal });
+                beep('write');
+                document.getElementById('overlay').classList.add('hidden');
+                document.getElementById('w-name').value = '';
+                document.getElementById('w-reg').value = '';
+                document.getElementById('w-prog').value = '';
+                alert(`SUCCESS!\nProgrammed card for ${name} (${programme})`);
+            } catch (err) {
+                if (err.name !== 'AbortError') { beep('err'); alert("Write failed. Ensure NFC is enabled."); }
+                document.getElementById('overlay').classList.add('hidden');
+            }
+        }
+
+        function cancelW() { if (wab) { wab.abort(); document.getElementById('overlay').classList.add('hidden'); } }
+        async function scan() {
+            try {
+                document.getElementById('b-start').disabled = true;
+                document.getElementById('b-start').className = "flex-1 bg-indigo-300 text-white font-bold py-2 rounded-xl text-xs cursor-wait";
+                document.getElementById('b-stop').disabled = false;
+                document.getElementById('b-stop').className = "flex-1 bg-rose-600 text-white font-bold py-2 rounded-xl text-xs cursor-pointer";
+                document.getElementById('pulse').classList.replace('hidden', 'inline-flex');
+                
+                const t = document.getElementById('target');
+                t.className = "border-2 border-solid border-indigo-300 rounded-xl p-6 text-center flex flex-col items-center justify-center bg-indigo-50/20 min-h-[160px]";
+                document.getElementById('icon').className = "fa-solid fa-mobile-screen text-2xl text-indigo-600 mb-2 animate-pulse";
+                document.getElementById('title').innerText = "Scanning Active";
+                document.getElementById('msg').innerText = "Hold card against phone to check-in.";
+
+                sab = new AbortController();
+                const ndef = new NDEFReader();
+                await ndef.scan({ signal: sab.signal });
+
+                ndef.onreading = async (event) => {
+                    let text = "";
+                    for (const rec of event.message.records) {
+                        if (rec.recordType === "text") {
+                            text = new TextDecoder(rec.encoding || 'utf-8').decode(rec.data);
+                            break;
+                        }
+                    }
+                    if (text) {
+                        try {
+                            const student = JSON.parse(text);
+                            if (student.name && student.reg) {
+                                await record(student.name, student.reg, student.programme || 'N/A');
+                            } else throw new Error("Invalid structure");
+                        } catch (e) {
+                            const p = text.split(',');
+                            if (p.length >= 2) {
+                                await record(p[0].trim(), p[1].trim(), p[2] ? p[2].trim() : 'N/A');
+                            } else { beep('err'); flash('error', "Invalid Card Data", "Card format not recognized."); }
+                        }
+                    } else { beep('err'); flash('error', "Empty Tag", "No text profile read."); }
+                };
+                ndef.onreadingerror = () => { beep('err'); flash('error', "Read Error", "Scan failed."); };
+            } catch (err) { stop(); alert("Could not start NFC scan. Make sure permissions are granted and NFC is enabled on your phone."); }
+        }
+
+        function stop() {
+            if (sab) { sab.abort(); sab = null; }
+            document.getElementById('b-start').disabled = false;
+            document.getElementById('b-start').className = "flex-1 bg-indigo-600 text-white font-bold py-2 rounded-xl text-xs";
+            document.getElementById('b-stop').disabled = true;
+            document.getElementById('b-stop').className = "flex-1 bg-slate-100 text-slate-400 font-bold py-2 rounded-xl text-xs cursor-not-allowed";
+            document.getElementById('pulse').classList.replace('inline-flex', 'hidden');
+            const t = document.getElementById('target');
+            t.className = "border-2 border-dashed border-slate-200 rounded-xl p-6 text-center flex flex-col items-center justify-center bg-slate-50 min-h-[160px]";
+            document.getElementById('icon').className = "fa-solid fa-mobile-screen text-2xl text-slate-400 mb-2";
+            document.getElementById('title').innerText = "Scanner Offline";
+            document.getElementById('msg').innerText = "Press Start and scan your NFC student tag.";
+        }
+
+        function flash(state, stTitle, stMsg) {
+            const t = document.getElementById('target'), icon = document.getElementById('icon'), title = document.getElementById('title'), msg = document.getElementById('msg');
+            const isS = state === 'success';
+            t.className = `border-2 border-solid rounded-xl p-6 text-center flex flex-col items-center justify-center min-h-[160px] ${isS ? 'border-emerald-500 bg-emerald-50' : 'border-rose-500 bg-rose-50'}`;
+            icon.className = `fa-solid ${isS ? 'fa-circle-check text-emerald-500' : 'fa-triangle-exclamation text-rose-500'} text-2xl mb-2 scale-110`;
+            title.className = `font-bold text-sm mb-1 ${isS ? 'text-emerald-800' : 'text-rose-800'}`; title.innerText = stTitle; msg.innerText = stMsg;
+
+            setTimeout(() => {
+                t.className = `border-2 rounded-xl p-6 text-center flex flex-col items-center justify-center min-h-[160px] ${sab ? 'border-solid border-indigo-300 bg-indigo-50/20' : 'border-dashed border-slate-200 bg-slate-50'}`;
+                icon.className = `fa-solid fa-mobile-screen text-2xl ${sab ? 'text-indigo-600 animate-pulse' : 'text-slate-400'} mb-2`;
+                title.className = "font-bold text-slate-700 text-sm mb-1"; title.innerText = sab ? "Scanning Active" : "Scanner Offline";
+                msg.innerText = sab ? "Hold card against phone to check-in." : "Press Start and scan your NFC student tag.";
+            }, 2000);
+        }
+
+        async function record(name, reg, programme) {
+            try {
+                const res = await fetch('/api/attendance', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ name, reg, programme: programme || 'N/A' })
+                });
+                if (!res.ok) {
+                    const body = await res.json().catch(() => ({}));
+                    throw new Error(body.error || "Server error");
+                }
+                const body = await res.json(), rec = body.record;
+                beep('ok');
+                flash('success', "Clocked In", `${rec.name} (${rec.programme}) verified.`);
+                appendFeed(rec.name, rec.reg, rec.programme, rec.timestamp, true);
+                logs.unshift(rec);
+            } catch (err) {
+                beep('err'); flash('error', "Clock-in Error", err.message || "Could not record clock-in to SQLite database.");
+            }
+        }
+        function filter() {
+            const q = document.getElementById('search').value.toLowerCase().trim();
+            if (!q) { renderTable(logs); return; }
+            renderTable(logs.filter(r => r.name.toLowerCase().includes(q) || r.reg.toLowerCase().includes(q) || (r.programme && r.programme.toLowerCase().includes(q))));
+        }
+
+        async function deleteSession(sessionId) {
+            if (!confirm("Are you sure you want to delete this session and all its attendance records?")) return;
+            
+            try {
+                const res = await fetch(`/api/sessions/delete/${sessionId}`, { method: 'DELETE' });
+                if (res.ok) {
+                    await loadLogs();
+                    alert("Session deleted successfully.");
+                } else {
+                    alert("Failed to delete session.");
+                }
+            } catch (e) {
+                alert("Error deleting session.");
+            }
+        }
+
+        async function clearDB() {
+            if (!confirm("WARNING: This will delete ALL sessions and ALL attendance records. Are you absolutely sure?")) return;
+            try {
+                const headers = { 'Content-Type': 'application/json' };
+                if (adminToken) headers['X-Admin-Token'] = adminToken;
+                
+                const res = await fetch('/api/attendance/clear', { 
+                    method: 'POST',
+                    headers: headers
+                });
+                
+                if (res.ok) {
+                    allSessions = [];
+                    showSessionList();
+                    flash('success', 'Cleared', 'Database has been wiped.');
+                } else {
+                    const err = await res.json();
+                    alert(err.error || "Failed to clear database.");
+                }
+            } catch (e) { alert("Failed to clear database."); }
+        }
+
+
+        function exportCSV() {
+            if (logs.length === 0) { alert("No attendance records to export."); return; }
+            const h = ["ID", "Name", "Reg Number", "Programme", "Clock-in Time"];
+            const r = logs.map(x => [x.id, `"${x.name}"`, `"${x.reg}"`, `"${x.programme || 'N/A'}"`, `"${x.timestamp}"`]);
+            const csv = "data:text/csv;charset=utf-8," + [h.join(","), ...r.map(e => e.join(","))].join("\n");
+            const link = document.createElement("a"); link.href = encodeURI(csv);
+            link.download = `StAT_Attendance_${new Date().toISOString().split('T')[0]}.csv`;
+            document.body.appendChild(link); link.click(); document.body.removeChild(link);
+        }
+
+        function escape(s) {
+            return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+        }
+    </script>
+</body>
+</html>

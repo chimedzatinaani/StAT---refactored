@@ -1,0 +1,4 @@
+# StAT: Student Attendance Tracker
+# server.py uses Python 3 built-in standard libraries (http.server, sqlite3, json).
+# No external pip dependencies required to run the server.
+

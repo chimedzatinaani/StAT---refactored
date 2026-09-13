@@ -12,38 +12,7 @@
     <style>body { font-family: sans-serif; }</style>
 </head>
 <body class="text-slate-800 min-h-screen flex flex-col bg-slate-50">
-    <header class="bg-indigo-600 text-white shadow p-4">
-        <div class="max-w-6xl mx-auto flex justify-between items-center">
-            <div class="flex items-center gap-2">
-                <!-- Hamburger Menu for Admins -->
-                <button id="menu-btn" onclick="toggleMenu()" class="hidden text-xl cursor-pointer mr-2">
-                    <i class="fa-solid fa-bars"></i>
-                </button>
-                <i class="fa-solid fa-id-card-clip text-xl"></i>
-                <h1 class="text-lg font-bold">StAT</h1>
-            </div>
-            <div class="flex items-center gap-3">
-                <div id="admin-badge" class="hidden items-center gap-2 px-3 py-1 rounded-full text-xs font-semibold bg-emerald-500/20 text-emerald-200">
-                    <i class="fa-solid fa-user-shield"></i> Admin
-                </div>
-                <button onclick="openAdminLogin()" id="admin-login-btn" class="px-3 py-1.5 rounded-xl text-xs font-bold bg-white/10 hover:bg-white/20 transition cursor-pointer">
-                    <i class="fa-solid fa-lock mr-1"></i> Admin Login
-                </button>
-            </div>
-        </div>
-    </header>
-
-    <!-- Admin Drawer -->
-    <div id="nav-drawer" class="hidden fixed inset-0 z-40">
-        <div class="absolute inset-0 bg-slate-900/50" onclick="toggleMenu()"></div>
-        <div class="absolute left-0 top-0 h-full w-64 bg-white shadow-xl p-6 space-y-4">
-            <h2 class="font-bold text-slate-800 mb-6">Admin Menu</h2>
-            <button onclick="switchView('nfc')" class="block w-full text-left py-2 text-sm font-semibold text-slate-700 hover:text-indigo-600">NFC Management</button>
-            <button onclick="switchView('db')" class="block w-full text-left py-2 text-sm font-semibold text-slate-700 hover:text-indigo-600">Attendance Logs</button>
-            <hr>
-            <button onclick="adminLogout()" class="block w-full text-left py-2 text-sm font-semibold text-rose-600 hover:text-rose-800">Logout</button>
-        </div>
-    </div>
+    <div id="nav-container"></div>
 
     <main class="flex-1 max-w-6xl w-full mx-auto p-4 space-y-6">
         <!-- Tab navigation placeholder, now handled by Drawer/Menu -->
@@ -360,8 +329,19 @@
             } catch (e) {}
         }
 
-        window.onload = () => {
+        window.onload = async () => {
             console.log("DEBUG: window.onload triggered");
+            
+            // Load nav component
+            try {
+                const response = await fetch('nav.html');
+                const navHtml = await response.text();
+                document.getElementById('nav-container').innerHTML = navHtml;
+                console.log("DEBUG: nav.html loaded");
+            } catch (err) {
+                console.error("DEBUG: Failed to load nav.html", err);
+            }
+
             const urlParams = new URLSearchParams(window.location.search);
             const sessionKey = urlParams.get('session');
             if (sessionKey) {

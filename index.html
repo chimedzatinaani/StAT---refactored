@@ -301,11 +301,13 @@
         }
 
         function updateAdminUI() {
+            console.log("DEBUG: updateAdminUI called. isAdmin =", isAdmin);
             const adminBadge = document.getElementById('admin-badge');
             const adminLoginBtn = document.getElementById('admin-login-btn');
             const menuBtn = document.getElementById('menu-btn');
 
             if (isAdmin) {
+                console.log("DEBUG: Setting UI to admin state");
                 adminBadge.classList.replace('hidden', 'flex');
                 adminLoginBtn.classList.add('hidden');
                 menuBtn.classList.remove('hidden');
@@ -316,6 +318,7 @@
                     tab('nfc');
                 }
             } else {
+                console.log("DEBUG: Setting UI to student state");
                 adminBadge.classList.replace('flex', 'hidden');
                 adminLoginBtn.classList.remove('hidden');
                 menuBtn.classList.add('hidden');

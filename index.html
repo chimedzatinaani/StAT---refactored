@@ -361,6 +361,7 @@
         }
 
         window.onload = () => {
+            console.log("DEBUG: window.onload triggered");
             const urlParams = new URLSearchParams(window.location.search);
             const sessionKey = urlParams.get('session');
             if (sessionKey) {
@@ -369,7 +370,8 @@
 
             // Use a more flexible check for the path
             const path = window.location.pathname;
-            if (path.includes('/checkin') || path.endsWith('/') || path.endsWith('/index.html')) {
+            console.log("DEBUG: Current path:", path);
+            if (path.includes('/checkin') || path.endsWith('/') || path.endsWith('/index.html') || path.endsWith('/StAT--refactored/')) {
                 tab('student');
             }
 
@@ -377,10 +379,13 @@
             loadLogs();
 
             const savedToken = sessionStorage.getItem('adminToken');
+            console.log("DEBUG: Saved token found:", savedToken);
             if (savedToken) {
                 isAdmin = true;
                 adminToken = savedToken;
                 updateAdminUI();
+            } else {
+                console.log("DEBUG: No admin token found, keeping student state");
             }
         };
 

@@ -249,6 +249,10 @@
         // Use a different variable name for the supabase client instance
         const sb = supabase.createClient('https://qzuplzvlzavaxnusypsu.supabase.co', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InF6dXBsenZsemF2YXhudXN5cHN1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODkyMjk5NTMsImV4cCI6MjEwNDgwNTk1M30.oapBjrCdppg11j5L8-DbNx2N7KgUuPtMKx0BQFQ-JyA');
         
+        function getBaseUrl() {
+            return window.location.href.split('?')[0].replace(/index\.html$/, '').replace(/\/$/, '');
+        }
+
         let sab = null, wab = null, logs = [], actx = null;
         let isAdmin = false, adminToken = null;
 
@@ -359,7 +363,9 @@
                 localStorage.setItem('current_session_key', sessionKey);
             }
 
-            if (window.location.pathname === '/checkin' || window.location.pathname === '/') {
+            // Use a more flexible check for the path
+            const path = window.location.pathname;
+            if (path.includes('/checkin') || path.endsWith('/') || path.endsWith('/index.html')) {
                 tab('student');
             }
 
@@ -525,8 +531,8 @@
                             <span class="text-[9px] text-slate-500">${escape(s.start_time)}</span>
                         </div>
                         <div class="flex gap-2">
-                            <input type="text" readonly value="${window.location.origin}/checkin?session=${s.session_key}" class="flex-1 bg-white px-2 py-1 border rounded text-[10px] text-slate-600 font-mono">
-                            <button onclick="navigator.clipboard.writeText('${window.location.origin}/checkin?session=${s.session_key}'); alert('Link copied!');" class="px-2 bg-slate-200 rounded text-[10px] font-bold">Copy</button>
+                            <input type="text" readonly value="${getBaseUrl()}/checkin?session=${s.session_key}" class="flex-1 bg-white px-2 py-1 border rounded text-[10px] text-slate-600 font-mono">
+                            <button onclick="navigator.clipboard.writeText('${getBaseUrl()}/checkin?session=${s.session_key}'); alert('Link copied!');" class="px-2 bg-slate-200 rounded text-[10px] font-bold">Copy</button>
                         </div>
                     </div>
                 `).join('');
@@ -653,7 +659,7 @@
         }
 
         async function writeSessionTag(sessionKey) {
-            const checkinUrl = window.location.origin + '/checkin?session=' + sessionKey;
+            const checkinUrl = getBaseUrl() + '/checkin?session=' + sessionKey;
             
             // Display link in UI
             document.getElementById('s-generated-link').value = checkinUrl;
@@ -667,7 +673,7 @@
             wab = new AbortController();
             try {
                 const ndef = new NDEFReader();
-                const checkinUrl = window.location.origin + '/checkin?session=' + sessionKey;
+                const checkinUrl = getBaseUrl() + '/checkin?session=' + sessionKey;
                 await ndef.write({
                     records: [{ recordType: "url", data: checkinUrl }]
                 }, { signal: wab.signal });
@@ -686,7 +692,7 @@
 
         async function writeTeacherTag() {
             if (!('NDEFReader' in window)) {
-                alert("Web NFC is not supported on this browser/device. Please use Chrome on Android or manually enter the URL into an NFC writer app: " + window.location.origin + "/checkin");
+                alert("Web NFC is not supported on this browser/device. Please use Chrome on Android or manually enter the URL into an NFC writer app: " + getBaseUrl() + "/checkin");
                 return;
             }
             document.getElementById('overlay').classList.remove('hidden');

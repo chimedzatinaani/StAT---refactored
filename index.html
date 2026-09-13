@@ -5,6 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>StAT - NFC Attendance Tracker</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
     <link rel="stylesheet" href="/static/css/all.min.css">
     <style>body { font-family: sans-serif; }</style>
 </head>
@@ -244,10 +246,14 @@
         StAT Student Attendance Tracker | Supports secure Web NFC (HTTPS/localhost)
     </footer>
     <script>
+        // Use a different variable name for the supabase client instance
+        const sb = supabase.createClient('https://qzuplzvlzavaxnusypsu.supabase.co', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InF6dXBsenZsemF2YXhudXN5cHN1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODkyMjk5NTMsImV4cCI6MjEwNDgwNTk1M30.oapBjrCdppg11j5L8-DbNx2N7KgUuPtMKx0BQFQ-JyA');
+        
         let sab = null, wab = null, logs = [], actx = null;
         let isAdmin = false, adminToken = null;
 
         function openAdminLogin() {
+            console.log("Opening admin login modal");
             document.getElementById('admin-login-modal').classList.remove('hidden');
             document.getElementById('admin-password-input').focus();
         }
@@ -260,30 +266,22 @@
 
         async function handleAdminLogin(e) {
             e.preventDefault();
+            console.log("Login attempt initiated");
             const password = document.getElementById('admin-password-input').value;
             const errorEl = document.getElementById('admin-login-error');
             
-            try {
-                const res = await fetch('/api/admin/auth', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ password })
-                });
-                const data = await res.json();
-                
-                if (data.success) {
-                    isAdmin = true;
-                    adminToken = data.token;
-                    sessionStorage.setItem('adminToken', adminToken);
-                    updateAdminUI();
-                    closeAdminLogin();
-                    flash('success', 'Logged In', 'Welcome back, Administrator.');
-                } else {
-                    errorEl.innerText = data.error || 'Invalid credentials';
-                    errorEl.classList.remove('hidden');
-                }
-            } catch (err) {
-                errorEl.innerText = 'Server error during authentication';
+            console.log("Password entered:", password);
+            
+            if (password === 'admin123') {
+                console.log("Password match! Logging in...");
+                isAdmin = true;
+                adminToken = 'admin_secret_token';
+                sessionStorage.setItem('adminToken', adminToken);
+                updateAdminUI();
+                closeAdminLogin();
+            } else {
+                console.log("Password mismatch");
+                errorEl.innerText = 'Invalid credentials';
                 errorEl.classList.remove('hidden');
             }
         }
@@ -422,39 +420,29 @@
                 if (!programme) {
                     programme = localStorage.getItem('stat_prog') || 'N/A';
                 }
-                const deviceId = getDeviceId();
                 const sessionKey = localStorage.getItem('current_session_key') || '';
-                const res = await fetch('/api/attendance', {
-                    method: 'POST',
-                    headers: { 
-                        'Content-Type': 'application/json',
-                        'X-Device-ID': deviceId
-                    },
-                    body: JSON.stringify({ name, reg, programme, device_id: deviceId, session_id: sessionKey })
-                });
                 
-                const body = await res.json();
-                const todayStr = new Date().toISOString().split('T')[0];
+                // Get session ID
+                const { data: session } = await sb.from('sessions').select('id').eq('session_key', sessionKey).single();
+                
+                const { data: rec, error } = await sb.from('attendance').insert({
+                    session_id: session ? session.id : null,
+                    student_name: name,
+                    reg_number: reg,
+                    programme: programme,
+                    timestamp: new Date().toLocaleString()
+                }).select().single();
 
-                if (!res.ok) {
-                    if (res.status === 400 && (body.error && body.error.includes('already recorded'))) {
-                        localStorage.setItem('stat_checked_in_date', todayStr);
-                        document.getElementById('auto-checkin-box').classList.add('hidden');
-                        document.getElementById('checkin-form-box').classList.add('hidden');
-                        document.getElementById('checkin-success-box').classList.remove('hidden');
-                        document.getElementById('success-details').innerText = `${name} (${programme}) is already checked in for today.`;
-                        return;
-                    }
-                    throw new Error(body.error || "Server error");
-                }
-                const rec = body.record;
+                if (error) throw error;
+
+                const todayStr = new Date().toISOString().split('T')[0];
                 localStorage.setItem('stat_checked_in_date', todayStr);
                 beep('ok');
 
                 document.getElementById('auto-checkin-box').classList.add('hidden');
                 document.getElementById('checkin-form-box').classList.add('hidden');
                 document.getElementById('checkin-success-box').classList.remove('hidden');
-                document.getElementById('success-details').innerText = `${rec.name} (${rec.programme}) recorded at ${rec.timestamp}`;
+                document.getElementById('success-details').innerText = `${rec.student_name} (${rec.programme}) recorded at ${rec.timestamp}`;
             } catch (err) {
                 beep('err');
                 document.getElementById('auto-checkin-box').classList.add('hidden');
@@ -507,26 +495,19 @@
 
         async function loadLogs() {
             try {
-                console.log("Fetching /api/attendance...");
-                const res = await fetch('/api/attendance');
-                if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
-                allSessions = await res.json();
+                console.log("Fetching data from Supabase...");
+                // Fetch sessions with their attendance
+                const { data, error } = await sb
+                    .from('sessions')
+                    .select('*, attendance(*)');
+                
+                if (error) throw error;
+                
+                allSessions = data || [];
                 console.log("Sessions loaded:", allSessions);
                 
                 showSessionList();
                 renderSessionsListProg();
-                
-                // Flatten records for the feed
-                // const allAttendance = [];
-                // allSessions.forEach(s => {
-                //     if (s.attendance) {
-                //         s.attendance.forEach(a => {
-                //             allAttendance.push({...a, session_title: s.title});
-                //         });
-                //     }
-                // });
-                // allAttendance.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
-                // renderFeed(allAttendance);
             } catch (e) {
                 console.error("loadLogs error:", e);
                 document.getElementById('db-list-view').innerHTML = `<p class="text-center py-6 text-rose-500 font-bold">Error: ${escape(e.message)}</p>`;
@@ -647,19 +628,20 @@
             if (!lecturer || !title || !date || !time) return;
 
             try {
-                const res = await fetch('/api/sessions/create', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ lecturer, title, start_time: date + ' ' + time.split('-')[0].trim(), end_time: date + ' ' + time.split('-')[1]?.trim() || '' })
-                });
-                const data = await res.json();
-                if (data.session_key) {
-                    await writeSessionTag(data.session_key);
-                } else {
-                    alert("Failed to create session: " + (data.error || "Unknown error"));
-                }
+                const sessionKey = crypto.randomUUID();
+                const { data, error } = await sb.from('sessions').insert({
+                    title: title,
+                    lecturer_name: lecturer,
+                    start_time: date + ' ' + time.split('-')[0].trim(),
+                    end_time: date + ' ' + (time.split('-')[1] ? time.split('-')[1].trim() : ''),
+                    session_key: sessionKey
+                }).select().single();
+
+                if (error) throw error;
+                
+                await writeSessionTag(sessionKey);
             } catch (err) {
-                alert("Server error: " + err.message);
+                alert("Database error: " + err.message);
             }
         }
 
@@ -845,22 +827,25 @@
 
         async function record(name, reg, programme) {
             try {
-                const res = await fetch('/api/attendance', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ name, reg, programme: programme || 'N/A' })
-                });
-                if (!res.ok) {
-                    const body = await res.json().catch(() => ({}));
-                    throw new Error(body.error || "Server error");
-                }
-                const body = await res.json(), rec = body.record;
+                // Find latest session or a specific one
+                const { data: session } = await sb.from('sessions').select('id').order('id', { ascending: false }).limit(1).single();
+                
+                const { data: rec, error } = await sb.from('attendance').insert({
+                    session_id: session ? session.id : null,
+                    student_name: name,
+                    reg_number: reg,
+                    programme: programme || 'N/A',
+                    timestamp: new Date().toISOString()
+                }).select().single();
+
+                if (error) throw error;
+                
                 beep('ok');
-                flash('success', "Clocked In", `${rec.name} (${rec.programme}) verified.`);
-                appendFeed(rec.name, rec.reg, rec.programme, rec.timestamp, true);
+                flash('success', "Clocked In", `${rec.student_name} (${rec.programme}) verified.`);
+                appendFeed(rec.student_name, rec.reg_number, rec.programme, rec.timestamp, true);
                 logs.unshift(rec);
             } catch (err) {
-                beep('err'); flash('error', "Clock-in Error", err.message || "Could not record clock-in to SQLite database.");
+                beep('err'); flash('error', "Clock-in Error", err.message);
             }
         }
         function filter() {
@@ -873,38 +858,36 @@
             if (!confirm("Are you sure you want to delete this session and all its attendance records?")) return;
             
             try {
-                const res = await fetch(`/api/sessions/delete/${sessionId}`, { method: 'DELETE' });
-                if (res.ok) {
-                    await loadLogs();
-                    alert("Session deleted successfully.");
-                } else {
-                    alert("Failed to delete session.");
-                }
+                const { error } = await supabase
+                    .from('sessions')
+                    .delete()
+                    .eq('id', sessionId);
+                
+                if (error) throw error;
+
+                await loadLogs();
+                alert("Session deleted successfully.");
             } catch (e) {
-                alert("Error deleting session.");
+                alert("Error deleting session: " + e.message);
             }
         }
 
         async function clearDB() {
             if (!confirm("WARNING: This will delete ALL sessions and ALL attendance records. Are you absolutely sure?")) return;
             try {
-                const headers = { 'Content-Type': 'application/json' };
-                if (adminToken) headers['X-Admin-Token'] = adminToken;
+                // In Supabase, deleting with filters can be done; 
+                // to delete all, we can filter for something that is always true or just use a dummy filter.
                 
-                const res = await fetch('/api/attendance/clear', { 
-                    method: 'POST',
-                    headers: headers
-                });
+                await sb.from('attendance').delete().neq('id', -1);
+                await sb.from('device_bindings').delete().neq('device_id', 'non_existent_id');
+                await sb.from('sessions').delete().neq('id', -1);
                 
-                if (res.ok) {
-                    allSessions = [];
-                    showSessionList();
-                    flash('success', 'Cleared', 'Database has been wiped.');
-                } else {
-                    const err = await res.json();
-                    alert(err.error || "Failed to clear database.");
-                }
-            } catch (e) { alert("Failed to clear database."); }
+                allSessions = [];
+                showSessionList();
+                flash('success', 'Cleared', 'Database has been wiped.');
+            } catch (e) { 
+                alert("Failed to clear database: " + e.message); 
+            }
         }
 
 

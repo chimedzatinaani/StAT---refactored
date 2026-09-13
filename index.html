@@ -583,8 +583,8 @@
                 : session.attendance.map(r => `
                     <tr class="hover:bg-slate-50">
                         <td class="py-2 px-4 text-center font-mono text-slate-400">${r.id}</td>
-                        <td class="py-2 px-4 font-semibold text-slate-900">${escape(r.name)}</td>
-                        <td class="py-2 px-4 font-mono text-slate-600">${escape(r.reg)}</td>
+                        <td class="py-2 px-4 font-semibold text-slate-900">${escape(r.student_name)}</td>
+                        <td class="py-2 px-4 font-mono text-slate-600">${escape(r.reg_number)}</td>
                         <td class="py-2 px-4 text-slate-600">${escape(r.programme || 'N/A')}</td>
                         <td class="py-2 px-4 font-mono text-slate-500">${escape(r.timestamp)}</td>
                     </tr>
@@ -912,6 +912,7 @@
         }
 
         function escape(s) {
+            if (typeof s !== 'string') return String(s);
             return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
         }
     </script>

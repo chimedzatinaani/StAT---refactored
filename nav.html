@@ -1,13 +1,17 @@
 <header class="bg-indigo-600 text-white shadow p-4">
     <div class="max-w-6xl mx-auto flex justify-between items-center">
         <div class="flex items-center gap-2">
-            <!-- Hamburger Menu for Admins -->
-            <button id="menu-btn" onclick="toggleMenu()" class="hidden text-xl cursor-pointer mr-2">
-                <i class="fa-solid fa-bars"></i>
-            </button>
             <i class="fa-solid fa-id-card-clip text-xl"></i>
             <h1 class="text-lg font-bold">StAT</h1>
         </div>
+        
+        <!-- Admin-only Nav -->
+        <div id="admin-nav" class="hidden flex items-center gap-4">
+            <button onclick="switchView('nfc')" class="text-xs font-bold hover:text-indigo-200">NFC</button>
+            <button onclick="switchView('db')" class="text-xs font-bold hover:text-indigo-200">Logs</button>
+            <button onclick="adminLogout()" class="text-xs font-bold text-rose-300 hover:text-rose-100">Logout</button>
+        </div>
+
         <div class="flex items-center gap-3">
             <div id="admin-badge" class="hidden items-center gap-2 px-3 py-1 rounded-full text-xs font-semibold bg-emerald-500/20 text-emerald-200">
                 <i class="fa-solid fa-user-shield"></i> Admin
@@ -18,15 +22,3 @@
         </div>
     </div>
 </header>
-
-<!-- Admin Drawer -->
-<div id="nav-drawer" class="hidden fixed inset-0 z-50">
-    <div class="absolute inset-0 bg-slate-900/50" onclick="toggleMenu()"></div>
-    <div class="absolute left-0 top-0 h-full w-64 bg-white shadow-xl p-6 space-y-4">
-        <h2 class="font-bold text-slate-800 mb-6">Admin Menu</h2>
-        <button onclick="switchView('nfc')" class="block w-full text-left py-2 text-sm font-semibold text-slate-700 hover:text-indigo-600">NFC Management</button>
-        <button onclick="switchView('db')" class="block w-full text-left py-2 text-sm font-semibold text-slate-700 hover:text-indigo-600">Attendance Logs</button>
-        <hr>
-        <button onclick="adminLogout()" class="block w-full text-left py-2 text-sm font-semibold text-rose-600 hover:text-rose-800">Logout</button>
-    </div>
-</div>

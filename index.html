@@ -273,13 +273,13 @@
             console.log("DEBUG: updateAdminUI called. isAdmin =", isAdmin);
             const adminBadge = document.getElementById('admin-badge');
             const adminLoginBtn = document.getElementById('admin-login-btn');
-            const menuBtn = document.getElementById('menu-btn');
+            const adminNav = document.getElementById('admin-nav');
 
             if (isAdmin) {
                 console.log("DEBUG: Setting UI to admin state");
                 adminBadge.classList.replace('hidden', 'flex');
                 adminLoginBtn.classList.add('hidden');
-                menuBtn.classList.remove('hidden');
+                adminNav.classList.replace('hidden', 'flex');
                 
                 // If on student view when logging in, switch to NFC management
                 const currentViewEl = document.querySelector('.tab-c.block');
@@ -290,7 +290,7 @@
                 console.log("DEBUG: Setting UI to student state");
                 adminBadge.classList.replace('flex', 'hidden');
                 adminLoginBtn.classList.remove('hidden');
-                menuBtn.classList.add('hidden');
+                adminNav.classList.replace('flex', 'hidden');
                 
                 // If currently on an admin view, switch back to student
                 const currentViewEl = document.querySelector('.tab-c.block');
@@ -463,12 +463,7 @@
             alert("Device Restriction: 1 device cannot be used to enter multiple accounts. This device is permanently bound to the registered student account.");
         }
 
-        function toggleMenu() {
-            document.getElementById('nav-drawer').classList.toggle('hidden');
-        }
-
         function switchView(view) {
-            toggleMenu();
             tab(view);
         }
 

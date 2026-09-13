@@ -889,9 +889,26 @@
 
 
         function exportCSV() {
-            if (logs.length === 0) { alert("No attendance records to export."); return; }
+            // Flatten all attendance records from all sessions
+            const allAttendance = [];
+            allSessions.forEach(session => {
+                if (session.attendance && session.attendance.length > 0) {
+                    session.attendance.forEach(record => {
+                        allAttendance.push({
+                            id: record.id,
+                            name: record.student_name,
+                            reg: record.reg_number,
+                            programme: record.programme || 'N/A',
+                            timestamp: record.timestamp
+                        });
+                    });
+                }
+            });
+
+            if (allAttendance.length === 0) { alert("No attendance records to export."); return; }
+            
             const h = ["ID", "Name", "Reg Number", "Programme", "Clock-in Time"];
-            const r = logs.map(x => [x.id, `"${x.name}"`, `"${x.reg}"`, `"${x.programme || 'N/A'}"`, `"${x.timestamp}"`]);
+            const r = allAttendance.map(x => [x.id, `"${x.name}"`, `"${x.reg}"`, `"${x.programme}"`, `"${x.timestamp}"`]);
             const csv = "data:text/csv;charset=utf-8," + [h.join(","), ...r.map(e => e.join(","))].join("\n");
             const link = document.createElement("a"); link.href = encodeURI(csv);
             link.download = `StAT_Attendance_${new Date().toISOString().split('T')[0]}.csv`;
